@@ -5,6 +5,8 @@ const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
+const fs = require('fs');
+const path = require('path');
 
 const app = express();
 const port = 3000;
@@ -31,17 +33,56 @@ app.use(morgan('combined'));
 
 const limiter = rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: 100, 
+    max: 100,
     message: 'Too many requests from this IP, please try again later.',
     standardHeaders: true,
     legacyHeaders: false,
     validate: {
-        xForwardedForHeader: false, 
+        xForwardedForHeader: false,
         trustProxy: false
     }
 });
 
 app.use('/api/', limiter);
+
+// ============ PLAYWRIGHT EXECUTABLE PATH FIX FOR RENDER ============
+function getPlaywrightExecutablePath() {
+    const possiblePaths = [
+        // Common paths on Render
+        '/opt/render/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell',
+        '/opt/render/.cache/ms-playwright/chromium-1208/chrome-linux/chrome',
+        '/opt/render/.cache/ms-playwright/chromium-1208/chrome-linux/chrome-headless-shell',
+        '/opt/render/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell'
+    ];
+
+    for (const testPath of possiblePaths) {
+        if (fs.existsSync(testPath)) {
+            console.log(`✅ Found Playwright executable at: ${testPath}`);
+            return testPath;
+        }
+    }
+
+    // If not found, list directory contents for debugging
+    console.log('📁 Playwright cache contents:');
+    const basePath = '/opt/render/.cache/ms-playwright';
+    if (fs.existsSync(basePath)) {
+        const dirs = fs.readdirSync(basePath);
+        dirs.forEach(dir => {
+            console.log(`  - ${dir}`);
+            const subPath = path.join(basePath, dir);
+            if (fs.statSync(subPath).isDirectory()) {
+                const subDirs = fs.readdirSync(subPath);
+                subDirs.forEach(subDir => {
+                    console.log(`    └─ ${subDir}`);
+                });
+            }
+        });
+    }
+
+    return null;
+}
+
+const playwrightExecutablePath = getPlaywrightExecutablePath();
 
 // Body parsing
 app.use(express.json({ limit: '10mb' }));
@@ -134,7 +175,10 @@ app.post('/api/hotel-prices', async (req, res) => {
 // ============ EXTRACTION FUNCTION ============
 
 async function extractHotelPrices({ adults, children, url }) {
-    const browser = await chromium.launch({
+
+    let browser;
+
+    const launchOptions = {
         headless: true,
         args: [
             '--no-sandbox',
@@ -143,13 +187,22 @@ async function extractHotelPrices({ adults, children, url }) {
             '--disable-gpu',
             '--window-size=1280,720'
         ]
+    };
+
+    // Use executable path if found
+    if (playwrightExecutablePath) {
+        launchOptions.executablePath = playwrightExecutablePath;
+        console.log(`🎯 Using executable: ${playwrightExecutablePath}`);
+    }
+
+    browser = await chromium.launch(launchOptions);
+
+    const context = await browser.newContext({
+        viewport: { width: 1280, height: 720 },
+        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
     });
 
-    const page = await browser.newPage();
-
-    // Set viewport and user agent to avoid detection
-    // await page.setViewportSize({ width: 1280, height: 720 });
-    // await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+    const page = await context.newPage();
 
     try {
         console.log(` Extracting prices for: ${adults} adults, ${children} children`);

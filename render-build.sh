@@ -8,16 +8,15 @@ echo "🚀 Starting build process..."
 # Install dependencies
 npm ci
 
-# Set environment variable to skip root requirement
-export PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=0
-export PLAYWRIGHT_BROWSERS_PATH=/opt/render/.cache/ms-playwright
-
-# Install Playwright browsers
+# Install ALL Playwright browsers and dependencies
 echo "🎭 Installing Playwright browsers..."
-npx playwright install chromium
+npx playwright install --with-deps chromium
 
-# Try to install deps with --no-root flag
-echo "🔧 Installing Playwright dependencies..."
-npx playwright install-deps --no-root || true
+# Verify installation
+echo "📁 Checking Playwright cache..."
+ls -la /opt/render/.cache/ms-playwright/
+
+# Set correct permissions
+chmod -R 755 /opt/render/.cache/ms-playwright/
 
 echo "✅ Build complete!"
