@@ -192,7 +192,7 @@ async function extractHotelPrices({ adults, children, url }) {
     // Use executable path if found
     if (playwrightExecutablePath) {
         launchOptions.executablePath = playwrightExecutablePath;
-        console.log(`🎯 Using executable: ${playwrightExecutablePath}`);
+        console.log(`Using executable: ${playwrightExecutablePath}`);
     }
 
     browser = await chromium.launch(launchOptions);
@@ -205,8 +205,8 @@ async function extractHotelPrices({ adults, children, url }) {
     const page = await context.newPage();
 
     try {
-        console.log(` Extracting prices for: ${adults} adults, ${children} children`);
-        console.log(`🌐 URL: ${url}`);
+        console.log(`Extracting prices for: ${adults} adults, ${children} children`);
+        console.log(`URL: ${url}`);
 
         // Navigate to the page with timeout
         await page.goto(url, {
